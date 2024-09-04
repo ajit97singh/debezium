@@ -240,6 +240,7 @@ public class MongoUtils {
         try {
             result = database.runCommand(new Document("hello", 1), BsonDocument.class);
         }catch (MongoException e) {
+            LOGGER.error(e.getMessage(), e);
             result = database.runCommand(new Document("isMaster", 1), BsonDocument.class);
         }
         return result.getTimestamp("operationTime");
