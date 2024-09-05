@@ -66,7 +66,6 @@ import io.debezium.connector.oracle.logminer.parser.XmlBeginParser;
 import io.debezium.data.Envelope;
 import io.debezium.pipeline.EventDispatcher;
 import io.debezium.pipeline.source.spi.ChangeEventSource.ChangeEventSourceContext;
-import io.debezium.relational.Attribute;
 import io.debezium.relational.Table;
 import io.debezium.relational.TableId;
 import io.debezium.relational.Tables;
@@ -482,23 +481,9 @@ public abstract class AbstractLogMinerEventProcessor<T extends Transaction> impl
                     // Special use case where the table has been dropped and purged, and we are processing an
                     // old event for the table that comes prior to the drop.
                     LOGGER.debug("Found DML for dropped table in history with object-id based table name {}.", row.getTableId().table());
-                    for (TableId tableId : schema.tableIds()) {
-                        LOGGER.debug("Processing table id '{}'", tableId);
-                        Table table = schema.tableFor(tableId);
-                        if (LOGGER.isDebugEnabled()) {
-                            for (Attribute attribute : table.attributes()) {
-                                LOGGER.debug("Attribute {} with value {}", attribute.name(), attribute.value());
-                            }
-                        }
-                        Attribute attribute = table.attributeWithName("OBJECT_ID");
-                        if (attribute != null) {
-                            LOGGER.debug("Found table '{}' with object id {}", table.id(), attribute.asLong());
-                        }
-                        if (attribute != null && attribute.asLong().equals(row.getObjectId())) {
-                            LOGGER.debug("Table lookup resolved to '{}'", table.id());
-                            row.setTableId(table.id());
-                            break;
-                        }
+                    final TableId tableId = schema.getTableIdByObjectId(row.getObjectId(), null);
+                    if (tableId != null) {
+                        row.setTableId(tableId);
                     }
                 }
                 if (!tableFilter.isIncluded(row.getTableId())) {
@@ -1416,15 +1401,9 @@ public abstract class AbstractLogMinerEventProcessor<T extends Transaction> impl
             }
             else if (tableId.table().equalsIgnoreCase("UNKNOWN")) {
                 // Object has been dropped and purged.
-                for (TableId schemaTableId : schema.tableIds()) {
-                    final Table table = schema.tableFor(schemaTableId);
-                    final Attribute objectId = table.attributeWithName("OBJECT_ID");
-                    final Attribute dataObjectId = table.attributeWithName("DATA_OBJECT_ID");
-                    if (objectId != null && dataObjectId != null) {
-                        if (row.getObjectId() == objectId.asLong() && row.getDataObjectId() == dataObjectId.asLong()) {
-                            return table.id();
-                        }
-                    }
+                final TableId resolvedTableId = schema.getTableIdByObjectId(row.getObjectId(), row.getDataObjectId());
+                if (resolvedTableId != null) {
+                    return resolvedTableId;
                 }
                 throw new DebeziumException("Failed to resolve UNKNOWN table name by object id lookup");
             }
