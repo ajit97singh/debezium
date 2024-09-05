@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import com.mongodb.MongoException;
 import org.bson.BsonDocument;
 import org.bson.BsonTimestamp;
 import org.bson.Document;
@@ -236,12 +235,7 @@ public class MongoUtils {
 
     public static BsonTimestamp hello(MongoClient client, String dbName) {
         var database = client.getDatabase(dbName);
-        BsonDocument result;
-        try {
-            result = database.runCommand(new Document("hello", 1), BsonDocument.class);
-        }catch (MongoException e) {
-            result = database.runCommand(new Document("isMaster", 1), BsonDocument.class);
-        }
+        var result = database.runCommand(new Document("hello", 1), BsonDocument.class);
         return result.getTimestamp("operationTime");
     }
 
